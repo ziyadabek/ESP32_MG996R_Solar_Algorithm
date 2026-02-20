@@ -1,13 +1,13 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include <WebServer.h>
 #include <EEPROM.h>
 #include <ESP32Servo.h>
 #include <SunPosition.h>
-#include <time.h>
+#include <WebServer.h>
+#include <WiFi.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
+#include <time.h>
 
 const int PIN_HOR = 5;
 const int PIN_VER = 18;
@@ -15,8 +15,8 @@ const int PIN_VOLTAGE = 34; // Вход делителя напряжения
 
 // Калибровка вольтметра
 const float R1 = 10000.0;
-const float R2 = 4700.0;
-const float V_REF = 3.3; 
+const float R2 = 5100.0;
+const float V_REF = 3.3;
 
 Servo servoHor;
 Servo servoVer;
@@ -24,7 +24,7 @@ WebServer server(80);
 
 // Память
 struct Config {
-  byte magic; 
+  byte magic;
   char ssid[32];
   char pass[32];
   int gmt;
@@ -279,8 +279,8 @@ void loadSettings() {
     strlcpy(cfg.ssid, "", sizeof(cfg.ssid));
     strlcpy(cfg.pass, "", sizeof(cfg.pass));
     cfg.gmt = 5;
-    cfg.lat = 51.1333; 
-    cfg.lon = 71.4333; 
+    cfg.lat = 51.1333;
+    cfg.lon = 71.4333;
     cfg.verMin = 15;
     cfg.verMax = 90;
     cfg.hOff = 0;
@@ -292,14 +292,18 @@ void loadSettings() {
 
 // Проверка включения сервоприводов
 void ensureServosAttached() {
-  if (!servoHor.attached()) servoHor.attach(PIN_HOR, 500, 2400);
-  if (!servoVer.attached()) servoVer.attach(PIN_VER, 500, 2400);
+  if (!servoHor.attached())
+    servoHor.attach(PIN_HOR, 500, 2400);
+  if (!servoVer.attached())
+    servoVer.attach(PIN_VER, 500, 2400);
 }
 
 // Отключение сервоприводов (Сон)
 void detachServos() {
-  if (servoHor.attached()) servoHor.detach();
-  if (servoVer.attached()) servoVer.detach();
+  if (servoHor.attached())
+    servoHor.detach();
+  if (servoVer.attached())
+    servoVer.detach();
 }
 
 // Моментальная установка
@@ -318,11 +322,15 @@ void smoothMove(int targetH, int targetV) {
   targetV = constrain(targetV, cfg.verMin, cfg.verMax);
 
   while (currentHor != targetH || currentVer != targetV) {
-    if (currentHor < targetH) currentHor++;
-    else if (currentHor > targetH) currentHor--;
+    if (currentHor < targetH)
+      currentHor++;
+    else if (currentHor > targetH)
+      currentHor--;
 
-    if (currentVer < targetV) currentVer++;
-    else if (currentVer > targetV) currentVer--;
+    if (currentVer < targetV)
+      currentVer++;
+    else if (currentVer > targetV)
+      currentVer--;
 
     servoHor.write(currentHor);
     servoVer.write(currentVer);
@@ -331,16 +339,16 @@ void smoothMove(int targetH, int targetV) {
 }
 
 void setupRouting() {
-  server.on("/", HTTP_GET, []() {
-    server.send(200, "text/html", index_html);
-  });
+  server.on("/", HTTP_GET, []() { server.send(200, "text/html", index_html); });
 
   server.on("/api/scan", HTTP_GET, []() {
-    int n = WiFi.scanNetworks(); 
+    int n = WiFi.scanNetworks();
     String json = "[";
-    for (int i=0; i<n; ++i) {
-      if (i>0) json += ",";
-      json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
+    for (int i = 0; i < n; ++i) {
+      if (i > 0)
+        json += ",";
+      json += "{\"ssid\":\"" + WiFi.SSID(i) +
+              "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
     }
     json += "]";
     server.send(200, "application/json", json);
@@ -348,11 +356,13 @@ void setupRouting() {
   });
 
   server.on("/api/status", HTTP_GET, []() {
-    xSemaphoreTake(dataMutex, portMAX_DELAY); 
-    time_t now; time(&now);
+    xSemaphoreTake(dataMutex, portMAX_DELAY);
+    time_t now;
+    time(&now);
     struct tm timeinfo;
     char timeStr[10] = "00:00:00";
-    if (getLocalTime(&timeinfo)) strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &timeinfo);
+    if (getLocalTime(&timeinfo))
+      strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &timeinfo);
 
     String json = "{";
     json += "\"time\":\"" + String(timeStr) + "\",";
@@ -365,10 +375,13 @@ void setupRouting() {
     json += "\"isAP\":" + String(isAPMode ? "true" : "false") + ",";
     json += "\"isNight\":" + String(isNight ? "true" : "false") + ",";
     json += "\"lat\":" + String(cfg.lat) + ",\"lon\":" + String(cfg.lon) + ",";
-    json += "\"gmt\":" + String(cfg.gmt) + ",\"verMin\":" + String(cfg.verMin) + ",";
-    json += "\"verMax\":" + String(cfg.verMax) + ",\"hOff\":" + String(cfg.hOff) + ",";
-    json += "\"vOff\":" + String(cfg.vOff) + ",\"ssid\":\"" + String(cfg.ssid) + "\"}";
-    xSemaphoreGive(dataMutex); 
+    json += "\"gmt\":" + String(cfg.gmt) + ",\"verMin\":" + String(cfg.verMin) +
+            ",";
+    json += "\"verMax\":" + String(cfg.verMax) +
+            ",\"hOff\":" + String(cfg.hOff) + ",";
+    json += "\"vOff\":" + String(cfg.vOff) + ",\"ssid\":\"" + String(cfg.ssid) +
+            "\"}";
+    xSemaphoreGive(dataMutex);
     server.send(200, "application/json", json);
   });
 
@@ -396,16 +409,25 @@ void setupRouting() {
   });
 
   server.on("/api/saveCfg", HTTP_GET, []() {
-    if(server.hasArg("ssid")) strlcpy(cfg.ssid, server.arg("ssid").c_str(), sizeof(cfg.ssid));
-    if(server.hasArg("pass")) strlcpy(cfg.pass, server.arg("pass").c_str(), sizeof(cfg.pass));
-    if(server.hasArg("lat")) cfg.lat = server.arg("lat").toFloat();
-    if(server.hasArg("lon")) cfg.lon = server.arg("lon").toFloat();
-    if(server.hasArg("gmt")) cfg.gmt = server.arg("gmt").toInt();
-    if(server.hasArg("verMin")) cfg.verMin = server.arg("verMin").toInt();
-    if(server.hasArg("verMax")) cfg.verMax = server.arg("verMax").toInt();
-    if(server.hasArg("hOff")) cfg.hOff = server.arg("hOff").toInt();
-    if(server.hasArg("vOff")) cfg.vOff = server.arg("vOff").toInt();
-    
+    if (server.hasArg("ssid"))
+      strlcpy(cfg.ssid, server.arg("ssid").c_str(), sizeof(cfg.ssid));
+    if (server.hasArg("pass"))
+      strlcpy(cfg.pass, server.arg("pass").c_str(), sizeof(cfg.pass));
+    if (server.hasArg("lat"))
+      cfg.lat = server.arg("lat").toFloat();
+    if (server.hasArg("lon"))
+      cfg.lon = server.arg("lon").toFloat();
+    if (server.hasArg("gmt"))
+      cfg.gmt = server.arg("gmt").toInt();
+    if (server.hasArg("verMin"))
+      cfg.verMin = server.arg("verMin").toInt();
+    if (server.hasArg("verMax"))
+      cfg.verMax = server.arg("verMax").toInt();
+    if (server.hasArg("hOff"))
+      cfg.hOff = server.arg("hOff").toInt();
+    if (server.hasArg("vOff"))
+      cfg.vOff = server.arg("vOff").toInt();
+
     cfg.magic = 123;
     EEPROM.put(0, cfg);
     EEPROM.commit();
@@ -422,20 +444,20 @@ void TaskWeb(void *pvParameters) {
       vTaskDelay(1000 / portTICK_PERIOD_MS);
       ESP.restart();
     }
-    vTaskDelay(10 / portTICK_PERIOD_MS); 
+    vTaskDelay(10 / portTICK_PERIOD_MS);
   }
 }
 
 // ================= ЯДРО 1 (Механика) =================
 void TaskTracker(void *pvParameters) {
   while (true) {
-    xSemaphoreTake(dataMutex, portMAX_DELAY); 
+    xSemaphoreTake(dataMutex, portMAX_DELAY);
 
     // Замер напряжения
     long sum = 0;
     for (int i = 0; i < 10; i++) {
       sum += analogRead(PIN_VOLTAGE);
-      vTaskDelay(2 / portTICK_PERIOD_MS); 
+      vTaskDelay(2 / portTICK_PERIOD_MS);
     }
     float vPin = ((float)sum / 10.0 / 4095.0) * V_REF;
     panelVolts = vPin * ((R1 + R2) / R2);
@@ -444,11 +466,10 @@ void TaskTracker(void *pvParameters) {
     if (mode != 0) {
       isNight = false;
       ensureServosAttached();
-      
+
       if (mode == 2) {
         setServos(90, 90);
-      } 
-      else if (mode == 3) {
+      } else if (mode == 3) {
         // Демо-режим (Плавное движение)
         demoHor += demoDirHor * 2; // Шаг 2 градуса
 
@@ -461,52 +482,60 @@ void TaskTracker(void *pvParameters) {
         }
 
         // Вертикаль имитирует солнце (подъем в центре, опускание по краям)
-        // Математика: парабола, где на 90 градусах азимута наклон максимальный (verMax)
+        // Математика: парабола, где на 90 градусах азимута наклон максимальный
+        // (verMax)
         float progress = abs(demoHor - 90) / 90.0; // от 0 (центр) до 1 (края)
         int targetV = cfg.verMax - (progress * (cfg.verMax - cfg.verMin));
 
         setServos(demoHor, targetV);
       }
-    } 
-    else if (mode == 0 && !isAPMode) { 
-      time_t now; time(&now);
-      if (now > 100000) { 
+    } else if (mode == 0 && !isAPMode) {
+      time_t now;
+      time(&now);
+      if (now > 100000) {
         SunPosition sun(cfg.lat, cfg.lon, now, cfg.gmt);
         sunAz = sun.azimuth();
         sunAlt = sun.altitude();
-        
+
         int targetHor = map(sunAz, 90, 270, 0, 180) + cfg.hOff;
         int targetVer = sunAlt + cfg.vOff;
 
         if (sunAlt <= 0) {
           if (!isNight) {
             isNight = true;
-            detachServos(); 
+            detachServos();
           }
-        } 
-        else {
+        } else {
           if (isNight) {
             isNight = false;
-            smoothMove(targetHor, targetVer); 
+            smoothMove(targetHor, targetVer);
           } else {
-            setServos(targetHor, targetVer); 
+            setServos(targetHor, targetVer);
           }
         }
       }
     }
 
-    xSemaphoreGive(dataMutex); 
-    
+    xSemaphoreGive(dataMutex);
+
     // В демо-режиме цикл работает быстрее для плавности
-    if (mode == 3) vTaskDelay(100 / portTICK_PERIOD_MS); 
-    else vTaskDelay(2000 / portTICK_PERIOD_MS); 
+    if (mode == 3)
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+    else
+      vTaskDelay(2000 / portTICK_PERIOD_MS);
   }
 }
 
 void setup() {
   Serial.begin(115200);
-  analogReadResolution(12); 
-  
+  delay(500);
+  analogReadResolution(12);
+
+  Serial.println();
+  Serial.println("==========================================");
+  Serial.println("   ☀️  Solar Tracker OS  |  Booting...");
+  Serial.println("==========================================");
+
   dataMutex = xSemaphoreCreateMutex();
   loadSettings();
 
@@ -518,27 +547,61 @@ void setup() {
   delay(100);
 
   if (String(cfg.ssid) != "") {
+    Serial.print("[WiFi] Подключение к сети: ");
+    Serial.println(cfg.ssid);
     WiFi.mode(WIFI_STA);
     WiFi.begin(cfg.ssid, cfg.pass);
     int tries = 0;
     while (WiFi.status() != WL_CONNECTED && tries < 20) {
-      delay(500); tries++;
+      delay(500);
+      Serial.print(".");
+      tries++;
     }
+    Serial.println();
     if (WiFi.status() != WL_CONNECTED) {
-      cfg.magic = 0; EEPROM.put(0, cfg); EEPROM.commit();
-      ESP.restart(); 
+      Serial.println("[WiFi] ОШИБКА подключения! Сброс настроек...");
+      cfg.magic = 0;
+      EEPROM.put(0, cfg);
+      EEPROM.commit();
+      ESP.restart();
     }
   }
 
   if (String(cfg.ssid) == "" || WiFi.status() != WL_CONNECTED) {
     isAPMode = true;
-    WiFi.mode(WIFI_AP_STA); 
+    WiFi.mode(WIFI_AP_STA);
     WiFi.softAP("SolarTracker", "12345678");
+    Serial.println();
+    Serial.println("------------------------------------------");
+    Serial.println("  [РЕЖИМ НАСТРОЙКИ — Точка Доступа (AP)]");
+    Serial.println("------------------------------------------");
+    Serial.println("  WiFi сеть : SolarTracker");
+    Serial.println("  Пароль    : 12345678");
+    Serial.print("  IP адрес  : ");
+    Serial.println(WiFi.softAPIP());
+    Serial.println("  Откройте браузер и введите IP адрес выше");
+    Serial.println("------------------------------------------");
   } else {
     isAPMode = false;
-    WiFi.mode(WIFI_STA); 
+    WiFi.mode(WIFI_STA);
     configTime(cfg.gmt * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    Serial.println();
+    Serial.println("------------------------------------------");
+    Serial.println("  [РАБОЧИЙ РЕЖИМ — Подключено к WiFi]");
+    Serial.println("------------------------------------------");
+    Serial.print("  Сеть      : ");
+    Serial.println(cfg.ssid);
+    Serial.print("  IP адрес  : ");
+    Serial.println(WiFi.localIP());
+    Serial.print("  GMT пояс  : +");
+    Serial.println(cfg.gmt);
+    Serial.println("  Откройте браузер и введите IP адрес выше");
+    Serial.println("------------------------------------------");
   }
+
+  Serial.println("[OK] Веб-сервер запущен на порту 80");
+  Serial.println("[OK] FreeRTOS задачи запущены");
+  Serial.println("==========================================");
 
   setupRouting();
   server.begin();
@@ -547,6 +610,4 @@ void setup() {
   xTaskCreatePinnedToCore(TaskTracker, "TrackerTask", 4096, NULL, 1, NULL, 1);
 }
 
-void loop() {
-  vTaskDelete(NULL); 
-}
+void loop() { vTaskDelete(NULL); }
